@@ -1,0 +1,7 @@
+93201115cb7dab13004027b65d0746f9 *ChangeLog
+f22a53a07b1bf37e94bc438dbff487ca *DESCRIPTION
+a6c9627afa8962a75cc39a6a87752ae4 *NAMESPACE
+2543afab30c63956bfa661aee1f844ec *R/explain.R
+cc465730db1714b20f44229cfaa26932 *R/init.R
+14a278e5bf6b7a5fc71db86b8a2b4708 *man/ExplainPrediction-package.Rd
+f9703d21831259921e926baff5b0fe27 *man/explanation.Rd
