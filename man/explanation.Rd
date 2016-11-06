@@ -4,12 +4,12 @@
 \alias{explanationAverages}
 \alias{explainVis}
 
-\title{Explanation of predictions on instance and model level}
+\title{Explanation of instance predictions and models}
 \description{
   Using general explanation methodology EXPLAIN or IME, the function \code{explainVis} explains
    predictions of given model and visualizes the  explanations.
-  An explanation of a prediction is given on a level of an individual instance, but aggregation of these explanations 
-  is also possible, which gives a model level explanation. The details are given in the description and references.
+  An explanation of prediction is given for an individual instance, but aggregation of these explanations 
+  is also possible, which gives explanation of the model. The details are given in the description and references.
   }
 \usage{
 explainVis(model, trainData, testData, visLevel=c("both","model","instance"),  
@@ -32,12 +32,11 @@ explainVis(model, trainData, testData, visLevel=c("both","model","instance"),
   \item{testData}{ Data frame with instances which will be explained. 
             The \code{testData} data frame shall contain the same columns as \code{trainData}, with possible exception
             of target variable, which can be omitted.}
-  \item{visLevel}{ The level of explanations desired. If \code{visLevel="model"} the explanation on the level of model is 
-           generated, meaning that instance level explanations obtained on \code{trainData} are aggregated. 
-           If \code{visLevel="instance"} one instance level
-             explanation for each row in testData is generated. 
-             The default value \code{visLevel="both"} generates both the model level 
-             as well as all the instance level explanations.}
+  \item{visLevel}{ The type of explanations desired. If \code{visLevel="model"} the explanation of model is 
+           generated, meaning that instance explanations obtained on \code{trainData} are aggregated. 
+           If \code{visLevel="instance"} an explanation for each instance (one row( in testData is generated. 
+             The default value \code{visLevel="both"} generates both the model explantion 
+             as well as explanations for all the instances.}
   \item{method}{ The explanation method; two methods are available, EXPLAIN and IME. The EXPLAIN is much faster 
                 and works for any number of attributes in the model,
           but cannot explain dependencies expressed disjunctively in the model (for details see references). 
@@ -87,29 +86,43 @@ explainVis(model, trainData, testData, visLevel=c("both","model","instance"),
                   \code{"rbf"} invokes RBF network based generator, and
                   \code{"indAttr"} assumes independent attributes and generates values 
                   for each attribute independently.}
-	 \item{noAvgBins}{For IME method the number of discretization bins used to present model level explanations
-	  and average explanations.}
-    \item{displayAttributes}{ The vector of attribute names which are visualized in model level visualization.
+	 \item{noAvgBins}{For IME method the number of discretization bins used to present model explanations
+	  and average explanations above individual explanations.}
+    \item{displayAttributes}{ The vector of attribute names which are shown in model explanation.
     The default value \code{displayThreshold=NULL} displays all attributes and their values.}
     \item{modelVisCompact}{ The logical value controlling if attribute values are displayed
-     in model level visualization. The default value \code{modelVisCompact=FALSE} displays all values of
+     in visualization of model explanation. The default value \code{modelVisCompact=FALSE} displays all values of
      attributes (subject to \code{displayThreshold}), and value \code{modelVisCompact=TRUE}
-     displays only contributions on the level of attributes (without their values).} 
+     displays only contributions for the whole attributes (without their values).} 
     \item{displayThreshold}{ The threshold value for absolute values of explanations 
      below which feature contributions are not displayed in instance and model explanation graphs. 
+     The threshold applies after the values are normalized, see the explanation for parameter \code{normalizeTo}.
     The default value \code{displayThreshold=0} displays contributions of all attributes.}
-    \item{normalizeTo}{ The absolute values of feature contributions are summed and normalized to the value of \code{normalizeTo}.
-    The value common in some areas ( e.g., in medicine) is 100. The default value 0 implies no normalization.}
+    \item{normalizeTo}{ For visualization of instance explanations the absolute values of feature contributions are 
+    summed and normalized to the value of \code{normalizeTo}.
+    In model explanation the normalization depends  on parameter \code{modelVisCompact}. If its value is \code{TRUE},
+    the absolute values of all feature explanations are summed up and normalized to \code{normalizeTo}, otherwise
+    the absolute values of all feature values' contributions are summed up.
+    The value of \code{normalizeTo} common in some areas ( e.g., in medicine) is 100. The default value 0 implies no normalization.
+    The \code{displayThreshold} parameter refers to already normalized values.}
   \item{displayColor}{The parameter determines if the visualization will be color or grayscale.}
   \item{noDecimalsInValueName}{With how many decimal places will the numeric feature values be presented in visualizations. 
                         The default value is 2.}
-  \item{modelTitle}{The value of parameter becomes the title of model level explanation graph. The information contained in \code{problemName}, class name and selected \code{classValue}
-                    are added to the end of provided character string.}     
-  \item{instanceTitle}{The value of parameter becomes the title of instance level explanation graph. The information contained in \code{problemName}, class name and selected \code{classValue}
-                    are added to the end of provided character string.}   
+  \item{modelTitle}{The value of the parameter becomes the first part of the title of model explanation graph. 
+               The information contained in \code{problemName}, class name and selected \code{classValue}
+               are concatenated to the end of provided character string. If \code{modelTitle=NULL} the title is not shown. }     
+  \item{instanceTitle}{The value of parameter becomes the first part of the title in instance explanation graph. 
+               The information contained in \code{problemName}, class name and selected \code{classValue}
+               are concatenated to the end of provided character string. If \code{instanceTitle=NULL} the title is not shown.}   
   \item{recall}{If parameter is different from NULL, it shall contain the list invisibly returned by one of previous calls to function \code{explainVis}. In this case the function reuses already computed explanations,
-  average explanations, discretization, etc.,  and only display data differently according to other supplied parameters.}  
-                                      
+  average explanations, discretization, etc.,  and only display data differently according to other supplied parameters. 
+  In this case values of parameters \code{model}, \code{testData} and \code{classValue}should be identical to the original call.
+  Values of parameters \code{trainData}, \code{method}, \code{naMode}, \code{explainType}, \code{nLaplace}, \code{estimator},
+  \code{pError}, \code{err}, \code{batchSize}, \code{maxIter}, \code{genType}, and \code{noAvgBins}   are ignored.    
+  The parameters that do matter in this case are the ones that affect the display of already precomputed
+  results: \code{visLevel}, \code{problemName}, \code{dirName}, \code{fileType}, 
+  \code{displayAttributes}, \code{modelVisCompact}, \code{displayThreshold}, \code{normalizeTo},
+  \code{displayColor}, \code{noDecimalsInValueName}, \code{modelTitle}, and \code{instanceTitle}.}                                    
 }
 \details{
 The function \code{explainVis} generates explanations and their visualizations given the trained model, 
@@ -118,11 +131,11 @@ care of everything, internally calling other functions.
 The produced visualizations are output to a graphical device or saved to a file. 
 If one requires internal information about the explanations, they are returned invisibly. 
 Separate calls to internal functions (\code{explain}, \code{ime}, 
-\code{prepareForExplanations}, and \code{explanationAverages} are also possible.
+\code{prepareForExplanations}, and \code{explanationAverages}) are also possible.
 
-In the model level explanation all feature values  of nominal attributes and intervals of numeric attributes are visualized, as
+In the model explanation all feature values  of nominal attributes and intervals of numeric attributes are visualized, as
 well as weighted summary over all these values. 
-In the instance level visualizations the contributions of each feature are presented (thick bars) as well as average contributions of these
+In the instance visualizations the contributions of each feature are presented (thick bars) as well as average contributions of these
 feature values in the \code{trainData} (thin bars above them). For details see the references below.
 
 The graph title is composed of \code{problemName}, response variable, class value name in case of classification,
@@ -206,7 +219,7 @@ destroyModels(modelRF) # clean up
 trainReg <- regDataGen(100)
 testReg <- regDataGen(20)
 modelRT <- CoreModel(response~., trainReg, model="regTree", modelTypeReg=1)
-# generate both model and instance level explanation using defaults
+# generate both model and instance explanations using the defaults
 explainVis(modelRT, trainReg, testReg) # don't forget to switch on the history
 destroyModels(modelRT) #clean up
 }

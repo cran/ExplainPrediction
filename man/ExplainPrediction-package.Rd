@@ -3,7 +3,7 @@
 \alias{ExplainPrediction}
 
 \docType{package}
-\title{Explanation of predictions and models}
+\title{Explanation of individual predictions and models}
 \description{
 The package ExplainPrediction contains methods to generate explanations for individual predictions of 
 classification and regression models. 

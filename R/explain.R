@@ -82,12 +82,24 @@ explain <- function(model, testData, explainInfo, naMode=c("avg", "na"), explain
 }
 
 getPredictions<-function(model, instances, nLaplace=1, noClasses=2,classIdx=1) {
-	pred <- predict(model, instances)
+	
+	if (model$model!="svm")
+		pred <- predict(model, instances)
+	else 
+		pred <- predict(model, instances, probability = TRUE)
+	
 	if (model$noClasses == 0) {
 		pCX <- pred
 	}
 	else {
-		pCX <- pred$probabilities[,classIdx]		
+		if (is.matrix(pred)) # nnet
+			pCX <- pred[,classIdx]
+		else if (model$model != "svm")
+			pCX <- pred$probabilities[,classIdx]	 # CoreModel
+		else if (!is.null(attr(pred, "probabilities"))) # SVM from e1071
+			pCX <- attr(pred, "probabilities")[,classIdx]		
+		else stop("Method predict returned unexpected object for model ", model$model)
+		
 		pCX <- correctLaplace(pCX, nLaplace, noClasses)
 	}
 	return(pCX)
@@ -339,22 +351,28 @@ explainVis<-function(model, trainData, testData, visLevel=c("both","model","inst
 	className <- all.vars(model$formula)[1]
 	modelName <- model$model
 	if (isRegression) {
-		modelTitleName <- sprintf("%s %s, %s\nmodel: %s", modelTitle, problemName, className, modelName)
+		if (is.null(modelTitle))
+			modelTitleName <- NULL
+		else
+			modelTitleName <- sprintf("%s %s, %s\nmodel: %s", modelTitle, problemName, className, modelName)
 		classValueName <- ""
 		explainType <- "predDiff"
 	}
 	else {
 		classValueName <- as.character(selClass)
-		modelTitleName <- sprintf("%s %s, %s = %s\nmodel: %s", modelTitle, problemName, className, classValueName, modelName)	
+		if (is.null(modelTitle))
+			modelTitleName <- NULL
+		else
+			modelTitleName <- sprintf("%s %s, %s = %s\nmodel: %s", modelTitle, problemName, className, classValueName, modelName)	
 	}
 	
 	## prepare explanations and averages
 	if (is.null(recall)) {
 		explainInfo <- prepareForExplanations(model, trainData, method=method, estimator=estimator, genType=genType, noAvgBins=noAvgBins)
-	    explAvg <- explanationAverages(model, trainData, method=method, explainInfo=explainInfo, 
-			naMode=naMode, explainType=explainType, classValue=classValue, nLaplace=nLaplace,
-			pError=pError, err=err, batchSize=batchSize, maxIter=maxIter)
-    }
+		explAvg <- explanationAverages(model, trainData, method=method, explainInfo=explainInfo, 
+				naMode=naMode, explainType=explainType, classValue=classValue, nLaplace=nLaplace,
+				pError=pError, err=err, batchSize=batchSize, maxIter=maxIter)
+	}
 	else {
 		explainInfo <- recall$explainInfo
 		explAvg <- recall$explAvg
@@ -370,8 +388,8 @@ explainVis<-function(model, trainData, testData, visLevel=c("both","model","inst
 	}
 	else if (method=="IME") {
 		if (is.null(recall))
-		   expl <- ime(model, testData, classValue=classValue, imeInfo=explainInfo, pError=pError, err=err, batchSize=batchSize, maxIter=maxIter)
-	    else
+			expl <- ime(model, testData, classValue=classValue, imeInfo=explainInfo, pError=pError, err=err, batchSize=batchSize, maxIter=maxIter)
+		else
 			expl <- recall$expl
 		methodDesc <- paste("method ", method, sep="")		
 	}
@@ -380,21 +398,21 @@ explainVis<-function(model, trainData, testData, visLevel=c("both","model","inst
 	attrNames <- colnames(expl$expl)
 	
 	# model explanation plot
-	if (visLevel %in% c("both","model","compactModel")) {
+	if (visLevel %in% c("both","model")) {
 		if (is.null(displayAttributes)) {
 			displayAttributes <- attrNames
 			matched <- 1:length(attrNames)
 		}
 		else { # check if provided names are correct
-			matched <- displayAttributes %in% attrNames
-			if (!all(matched))
-				stop("Invalid attribute name(s) in parameter displayAttributes: ", paste(displayAttributes[ !matched ], collapse=", "))
+			matched <- match(displayAttributes, attrNames)
+			if (any(is.na(matched)))
+				stop("Invalid attribute name(s) in parameter displayAttributes: ", paste(displayAttributes[ is.na(matched) ], collapse=", "))
 		} 
 		preparePlot(fileName=paste(dirName,"/", problemName,"_model.", fileType, sep=""))
 		modelAVexplain(modelTitleName, displayAttributes, explainInfo$avNames[matched],  
 				explainDesc=methodDesc, explAvg$attrPosAvg[matched], explAvg$attrNegAvg[matched], 
 				explAvg$avPosAvg[matched], explAvg$avNegAvg[matched], 
-				modelVisCompact=modelVisCompact, displayThreshold=displayThreshold, displayColor=displayColor)
+				modelVisCompact=modelVisCompact, displayThreshold=displayThreshold, displayColor=displayColor, normalizeTo=normalizeTo)
 		#modelAVexplain(modelTitleName, attrNames, explainInfo$avNames,  
 		#		explainDesc=methodDesc, explAvg$attrPosAvg, explAvg$attrNegAvg, 
 		#		explAvg$avPosAvg, explAvg$avNegAvg, displayAttributes=displayAttributes, modelVisCompact=modelVisCompact, displayThreshold=displayThreshold, displayColor=displayColor)
@@ -436,14 +454,14 @@ explainVis<-function(model, trainData, testData, visLevel=c("both","model","inst
 
 modelAVexplain<-function(titleName, attrNames, attrValues, explainDesc, 
 		attrExplainPos,	attrExplainNeg, avExplainPos,avExplainNeg, 
-		modelVisCompact=FALSE, displayThreshold=0.0, displayColor=c("color","grey"))
+		modelVisCompact=FALSE, displayThreshold=0.0, displayColor=c("color","grey"),normalizeTo=0)
 {
 	displayColor <- match.arg(displayColor,c("color","grey"))
 	if (displayColor=="color"){
 		colAttrPos <- "blue"  
 		colAttrNeg <- "red"
-		colAVpos <- "orange"
-		colAVneg <- "lightblue"
+		colAVpos <- "lightblue"
+		colAVneg <-  "orange"
 	}
 	else if (displayColor=="grey") {
 		colAttrPos <- "gray50"  
@@ -457,9 +475,30 @@ modelAVexplain<-function(titleName, attrNames, attrValues, explainDesc,
 	maxChars <- max(nchar(aname))
 	allValues <- noAttr
 	avname <- list()
-	xLim <- max(abs(attrExplainPos), abs(attrExplainNeg))
 	yLabel <- c()
 	usedValues <- list()
+	
+	#normalization of explanations
+	if (normalizeTo > 0) {
+		if (modelVisCompact){ # normalize to parameter normalizeTo times the sum of absolute values of attribute-s contributions 
+			absSum <- sum(abs(attrExplainPos), abs(attrExplainNeg))
+			attrExplainPos <- attrExplainPos / absSum * normalizeTo
+			attrExplainNeg <- attrExplainNeg / absSum * normalizeTo
+		}
+		else { # normalize to parameter normalizeTo times the sum of absolute values of attribute values' contributions 
+			absSum <- 0
+			for(iA in 1:noAttr) 
+				absSum <- sum(absSum, abs(avExplainPos[[iA]]), abs(avExplainNeg[[iA]]))
+			attrExplainPos <- attrExplainPos / absSum * normalizeTo
+			attrExplainNeg <- attrExplainNeg / absSum * normalizeTo
+			for(iA in 1:noAttr) {
+				avExplainPos[[iA]] <- avExplainPos[[iA]] / absSum * normalizeTo
+				avExplainNeg[[iA]] <- avExplainNeg[[iA]] / absSum * normalizeTo
+			}
+		}		
+	}
+	# getting limits and labels
+	xLim <- max(abs(attrExplainPos), abs(attrExplainNeg))
 	if (modelVisCompact){
 		yLabel <- attrNames	
 	}
@@ -471,17 +510,16 @@ modelAVexplain<-function(titleName, attrNames, attrValues, explainDesc,
 			yLabel <- c(yLabel,attrNames[[a]])
 			yLabel <- c(yLabel,avname[[a]])
 			xLim <- max(xLim, abs(avExplainPos[[a]][usedValues[[a]]]), abs(avExplainNeg[[a]][usedValues[[a]]]))      
-			maxChars <- max(maxChars, nchar(avname[[a]]))
-			#		for (v in 1:length(attrValues[[a]])) {
-			#			xLim = max(xLim, abs(avExplainPos[[a]][v]), abs(avExplainNeg[[a]][v]))      
-			#			maxChars = max(maxChars, nchar(avname[[a]][[v]]))
-			#		}
+			maxChars <- max(maxChars, nchar(avname[[a]]))	
 		}  
 	}
 	x <- c(0, 0)
 	y <- c(1, allValues)
+	headerSpace <- 0.5
+	if (allValues <=5)
+		headerSpace <- 1
 	par(xpd=NA,mgp=c(3,0.7,0),mar=c(4.5,7,4,2))
-	plot(x, y, type = "l", xlim = c(-xLim, xLim), ylim = c(1, allValues+0.5), xlab = explainDesc,
+	plot(x, y, type = "l", xlim = c(-xLim, xLim), ylim = c(1, allValues+headerSpace), xlab = explainDesc,
 			ylab = "", axes = F)
 	atLabel <- atLabelComp(xLim)
 	axis(1, at=atLabel,labels=atLabel)
@@ -555,9 +593,19 @@ explainVisPN<-function(instanceTitle, problemName, instanceName, modelName, clas
 	}
 	
 	noAttr = length(attrNames)
+	absSum <- sum(abs(expl))
+	if (is.null(avgAVexplainPos))
+		avgAVexplainPos <- rep(0, length(expl))
+	if (is.null(avgAVexplainNeg))
+		avgAVexplainNeg <- rep(0, length(expl))
+	# normalization of values
+	if (normalizeTo > 0 && absSum > 0){
+			expl <-  expl / absSum * normalizeTo
+			avgAVexplainPos <-  avgAVexplainPos / absSum * normalizeTo	
+			avgAVexplainNeg <-  avgAVexplainNeg / absSum * normalizeTo
+	}
 	usedAttr <- which(abs(expl[]) >= threshold)
 	noUsed <- length(usedAttr)
-	absSumUsed <- sum(abs(expl[usedAttr]))
 	if (noUsed == 0) {
 		plot.new()
 		text(0.5,0.5,"All explanations are below treshold", vfont=c("serif","bold"))
@@ -585,20 +633,9 @@ explainVisPN<-function(instanceTitle, problemName, instanceName, modelName, clas
 				maxCharsV = max(maxCharsV, nchar(usedAttrValues[[iA]][[v]]))
 				usedAttrValues[[iA]][[v]] <- usedAttrValues[[iA]][[v]]   
 				# usedAttrValues[[iA]][[v]] <- gsub("_","\n",usedAttrValues[[iA]][[v]],fixed=TRUE) ;   
-			}
-			
+			}		
 		}  
-		if (is.null(avgAVexplainPos))
-			avgAVexplainPos <- rep(0, length(expl))
-		if (is.null(avgAVexplainNeg))
-			avgAVexplainNeg <- rep(0, length(expl))
-		if (normalizeTo > 0 && absSumUsed > 0){
-			for(iA in 1:noUsed) {
-				expl[usedAttr[[iA]] ] <-  expl[usedAttr[[iA]] ] / absSumUsed * normalizeTo
-				avgAVexplainPos[[usedAttr[[iA]] ]] <-  avgAVexplainPos[[usedAttr[[iA]] ]] / absSumUsed * normalizeTo	
-				avgAVexplainNeg[[usedAttr[[iA]] ]] <-  avgAVexplainNeg[[usedAttr[[iA]] ]] / absSumUsed * normalizeTo
-			}
-		}
+
 		boxHeight = 1.0
 		chExp = 1.0  ## char expansion for boxes
 		xLim <- max(abs(expl),abs(avgAVexplainPos),abs(avgAVexplainNeg))
@@ -635,11 +672,17 @@ explainVisPN<-function(instanceTitle, problemName, instanceName, modelName, clas
 		axis(4, at=+boxHeight/8.0+c(1:noUsed), labels=usedAttrValues, las=lasV, cex.axis=cex.axisV)
 		
 		if (classValueName=="") { ## regression
-			titleName <- sprintf("%s %s, %s\ninstance: %s, model: %s", instanceTitle, problemName, className, instanceName, modelName)
+			if (is.null(instanceTitle))
+				titleName <- NULL
+			else
+				titleName <- sprintf("%s %s, %s\ninstance: %s, model: %s", instanceTitle, problemName, className, instanceName, modelName)
 			subtitleName <- sprintf("%s = %.2f", className, pCXA)
 		}
 		else {
-			titleName <- sprintf("%s %s, %s = %s\ninstance: %s, model: %s", instanceTitle, problemName, className, classValueName, instanceName, modelName)	
+			if (is.null(instanceTitle))
+				titleName <- NULL
+			else			
+				titleName <- sprintf("%s %s, %s = %s\ninstance: %s, model: %s", instanceTitle, problemName, className, classValueName, instanceName, modelName)	
 			subtitleName <- sprintf("p(%s=%s) = %.2f", className, classValueName, pCXA)
 		}
 		
@@ -649,7 +692,6 @@ explainVisPN<-function(instanceTitle, problemName, instanceName, modelName, clas
 			else tcStr<-sprintf("true %s=%s", className, trueClass)
 			subtitleName<-paste(subtitleName,tcStr,sep=";  ")
 		}
-		
 		
 		title(main = titleName, sub=subtitleName)
 		for(iA in 1:noUsed) {
@@ -763,7 +805,8 @@ ime <- function(model, testData, classValue=1, imeInfo, pError=0.05, err=0.05, b
 				perm[] <- sample(c(FALSE,TRUE),size=batchMxSize,replace=TRUE)
 				inst1 <- newdata(imeInfo$generator, size=batchSize)[,colnames(expl)] # random instances
 				perm[,a] <- FALSE # a-th shall not be replaced with selected instance
-				inst1[perm] <- inst[perm] # replace TRUE (preeceding) with selected instance
+				for (r in 1:noAttr) # a loop is needed to assure a single attribute is replaced at a time, which prevents type coercion to character
+					inst1[perm[,r],r] <- inst[perm[,r],r] # replace TRUE (preeceding) with selected instance
 				inst2 <- inst1 # inst2 has all succedding (including a-th) filled with random instances
 				inst1[,a] <- dat[i,a] # inst1 has a-th filled with selected instance
 				
@@ -790,3 +833,38 @@ ime <- function(model, testData, classValue=1, imeInfo, pError=0.05, err=0.05, b
 } 
 
 
+wrap4Explanation <- function(model){
+	if (inherits(model, "nnet")) {
+		model$model <- "nnet"
+		termNames <- as.character(attr(model$terms, "variables"))[-1]
+		model$formula<- reformulate(termNames[-1],response=termNames[1])
+		model$class.lev <-model$lev
+		if (is.null(model$class.lev))
+			model$noClasses <- 0
+		else model$noClasses <-length(model$class.lev)
+		class(model) <- c(class(model), "CoreModel")
+	}
+	else if (inherits(model, "svm")) {
+		model$model <- "svm"
+		termNames <- as.character(attr(model$terms, "variables"))[-1]
+		model$formula<- reformulate(termNames[-1],response=termNames[1])
+		model$class.lev <-model$levels
+		if (is.null(model$class.lev))
+			model$noClasses <- 0
+		else model$noClasses <-length(model$class.lev)
+		class(model) <- c(class(model), "CoreModel")
+	}
+	else if (inherits(model, "randomForest")) {
+		model$model <- "randomForest"
+		termNames <- as.character(attr(model$terms, "variables"))[-1]
+		model$formula <- reformulate(termNames[-1],response=termNames[1])
+		model$class.lev <- model$levels
+		if (is.null(model$class.lev))
+			model$noClasses <- 0
+		else model$noClasses <- length(model$class.lev)
+		class(model) <- c(class(model), "CoreModel")
+	}
+	else stop("Unknown class of provided model ", class(model))
+	
+	model
+}
