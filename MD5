@@ -1,8 +1,8 @@
-09a9232cff0b08ef2666ab26e10dd0a3 *ChangeLog
-18d097516fcf9f4c195f903433923ba0 *DESCRIPTION
-e0d721b6d76c0f293a9c2575f50c2b4d *NAMESPACE
-b489d3411669f7926bcd6f490122d509 *R/explain.R
+355eaec683aa614c1cc76b974d13d9aa *ChangeLog
+6e67ce7da08f41a63c311daa8b3594de *DESCRIPTION
+d0c843d303bdd180263229b6db791197 *NAMESPACE
+dd64c26661a23b43303ae0b8616ba49c *R/explain.R
 cc465730db1714b20f44229cfaa26932 *R/init.R
 2be06b86a4a87bc965f6d0a0bbfdcde2 *man/ExplainPrediction-package.Rd
-0500f517cde86f3763eac7497abefa59 *man/explanation.Rd
+c6a53fb5ade4a1655f5fa8c28cae5690 *man/explanation.Rd
 009e4b4d2553e0c098bfa341c97bee65 *man/wrap4Explanation.Rd
