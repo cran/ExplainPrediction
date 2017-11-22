@@ -54,7 +54,7 @@ modelNNet <- wrap4Explanation(modelNN)
 # turn on history in the visualization window to see all graphs
 explainVis(modelNNet, iris[trainIdxs,], iris[testIdxs,], method="EXPLAIN",visLevel="both",
            problemName="iris", fileType="none", 
-           naMode="avg", explainType="WE", classValue=1, displayColor="color") 
+           naMode="avg", explainType="WE", classValue=1) 
 }
 }
 \keyword{ models }
