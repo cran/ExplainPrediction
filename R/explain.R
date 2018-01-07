@@ -166,8 +166,9 @@ correctLaplace <- function(pC, n, nC) {
 prepareForExplanations <- function(model, trainData, method=c("EXPLAIN", "IME"), estimator=NULL, 
 		genType=c("rf","rbf","indAttr"), noAvgBins=20) {
 	
-	method <- match.arg(method)
 	explainInfo <- list(discretization=list(), avNames=list())
+	
+	method <- match.arg(method)
 	
 	if (method == "IME") {
 		genType <- match.arg(genType)	
@@ -188,7 +189,7 @@ prepareForExplanations <- function(model, trainData, method=c("EXPLAIN", "IME"),
 		# prepare discretization points and names
 		for (a in 1:length(attrNames)) {
 			aname <- attrNames[a]  
-			explainInfo$avNames[[a]] <- levels(discData[1,aname])
+			explainInfo$avNames[[a]] <- levels(discData[[aname]])
 		}	
 	}
 	else if (method=="EXPLAIN") {
@@ -209,22 +210,22 @@ prepareForExplanations <- function(model, trainData, method=c("EXPLAIN", "IME"),
 		# prepare discretization points and names
 		for (a in 1:length(attrNames)) {
 			aname <- attrNames[a]  
-			if (is.factor(trainData[1,aname])) {
-				ordered <- is.ordered(trainData[1,aname])
-				explainInfo$discPoints[[a]] <- factor(levels(trainData[1,aname]), levels=levels(trainData[1,aname]), ordered=ordered)
+			if (is.factor(trainData[[aname]])) {
+				ordered <- is.ordered(trainData[[aname]])
+				explainInfo$discPoints[[a]] <- factor(levels(trainData[[aname]]), levels=levels(trainData[[aname]]), ordered=ordered)
 			}
 			else {
 				explainInfo$discPoints[[a]] <- midPoints[[aname]]   
 			}
-			explainInfo$avNames[[a]] <- levels(discData[1,aname])
+			explainInfo$avNames[[a]] <- levels(discData[[aname]])
 		}
 		names(explainInfo$discPoints) <-names(explainInfo$avNames) <- attrNames
 		# prepare pAV, probabilities of attribute values or discretization intervals 
 		for (a in 1:length(attrNames)) {
 			aname <- attrNames[a]  
-			noVal <- table(discData[,aname], useNA="no")
+			noVal <- table(discData[[aname]], useNA="no")
 			explainInfo$pAV[[a]] <- correctLaplace(noVal / sum(noVal), nrow(discData), length(noVal))
-			names(explainInfo$pAV[[a]]) <- levels(discData[1,aname])
+			names(explainInfo$pAV[[a]]) <- levels(discData[[aname]])
 		}
 		names(explainInfo$pAV) <- attrNames
 	}
@@ -287,19 +288,19 @@ explanationAverages <- function(model, trainData, method=c("EXPLAIN", "IME"), ex
 		
 		# averages
 		avExplainPos[[a]] = avExplainPos[[a]] / avExplainNoPos[[a]]
-		avExplainPos[[a]][is.nan(avExplainPos[[a]])] <- 0
+		avExplainPos[[a]][is.nan(avExplainPos[[a]]) | is.na(avExplainPos[[a]]) ] <- 0
 		avExplainNeg[[a]] = avExplainNeg[[a]] / avExplainNoNeg[[a]]
-		avExplainNeg[[a]][is.nan(avExplainNeg[[a]])] <- 0
+		avExplainNeg[[a]][is.nan(avExplainNeg[[a]]) | is.na(avExplainNeg[[a]])] <- 0
 		avExplain[[a]] = (avExplainPos[[a]] + avExplainNeg[[a]]) / avExplainNo[[a]]
-		avExplain[[a]][is.nan(avExplain[[a]])] <- 0
+		avExplain[[a]][is.nan(avExplain[[a]]) | is.na(avExplain[[a]])] <- 0
 	}
 	# attribute explanation averages
 	aExplain = (aExplainPosSum + aExplainNegSum) / (aExplainNoPos + aExplainNoNeg)
-	aExplain[is.nan(aExplain)] <- 0
+	aExplain[is.nan(aExplain) | is.na(aExplain)] <- 0
 	aExplainPos = aExplainPosSum / aExplainNoPos
-	aExplainPos[is.nan(aExplainPos)] <- 0
+	aExplainPos[is.nan(aExplainPos) | is.na(aExplainPos)] <- 0
 	aExplainNeg = aExplainNegSum / aExplainNoNeg
-	aExplainNeg[is.nan(aExplainNeg)] <- 0
+	aExplainNeg[is.nan(aExplainNeg) | is.na(aExplainNeg)] <- 0
 	
 	return(list(attrAvg=aExplain, attrPosAvg=aExplainPos, attrNegAvg=aExplainNeg, avAvg=avExplain, avPosAvg=avExplainPos, avNegAvg=avExplainNeg))
 }
@@ -317,14 +318,15 @@ explainVis<-function(model, trainData, testData,
 		modelTitle=ifelse(model$noClasses==0,"Explaining %R\nmodel: %M", "Explaining %R=%V\nmodel: %M"), 
 		modelSubtitle="Method: %E, type: %X", 
 		instanceTitle=ifelse(model$noClasses==0, "Explaining %R\ninstance: %I, model: %M", 
-				                                 "Explaining %R=%V\ninstance: %I, model: %M"), 
+				"Explaining %R=%V\ninstance: %I, model: %M"), 
 		instanceSubtitle=ifelse(model$noClasses==0, "Method: %E\nf(%I)=%P, true %R=%T", 
-				                                    "Method: %E, type: %X\nP(%R=%V)=%P, true %R=%T"), 
+				"Method: %E, type: %X\nP(%R=%V)=%P, true %R=%T"), 
 		recall=NULL) 
 {
-	
 	if (! inherits(model, "CoreModel"))
 		stop("Model shall be of class CoreModel.")
+	if (is.null(trainData))
+		stop("Providing training data is obligatory as it enables computation of discretization and data generator.")
 	isRegression <- model$noClasses == 0
 	noInst <- nrow(testData)
 	if (! isRegression) {
@@ -347,6 +349,7 @@ explainVis<-function(model, trainData, testData,
 		else 
 			stop("Wrong type of classValue parameter supplied: ", classValue)
 	}
+	
 	visLevel <- match.arg(visLevel)
 	method <- match.arg(method)
 	naMode <- match.arg(naMode)
@@ -374,13 +377,12 @@ explainVis<-function(model, trainData, testData,
 	# Explanation method: %E
 	# Explanation type: %X
 	
-    titles <- c(modelTitle, modelSubtitle, instanceTitle, instanceSubtitle)
+	titles <- c(modelTitle, modelSubtitle, instanceTitle, instanceSubtitle)
 	titles <- gsub("%R", className, titles, fixed=TRUE)
 	titles <- gsub("%V", classValueName, titles, fixed=TRUE)
 	titles <- gsub("%M", modelName, titles, fixed=TRUE)
 	titles <- gsub("%E", method, titles, fixed=TRUE)
 	titles <- gsub("%X", explainType, titles, fixed=TRUE)
-	
 	
 	## prepare explanations and averages
 	if (is.null(recall)) {
@@ -388,31 +390,21 @@ explainVis<-function(model, trainData, testData,
 		explAvg <- explanationAverages(model, trainData, method=method, explainInfo=explainInfo, 
 				naMode=naMode, explainType=explainType, classValue=classValue, nLaplace=nLaplace,
 				pError=pError, err=err, batchSize=batchSize, maxIter=maxIter)
+		expl <- NULL
 	}
 	else {
 		explainInfo <- recall$explainInfo
 		explAvg <- recall$explAvg
-	}
-	testDataDisc <- applyDiscretization(testData, explainInfo$discretization)
-	
-	if (method=="EXPLAIN") {
-		if (is.null(recall))
-			expl <- explain(model, testData, explainInfo=explainInfo, naMode=naMode, explainType=explainType, classValue=classValue, nLaplace=nLaplace)
-		else 
-			expl <- recall$expl
-	}
-	else if (method=="IME") {
-		if (is.null(recall))
-			expl <- ime(model, testData, classValue=classValue, imeInfo=explainInfo, pError=pError, err=err, batchSize=batchSize, maxIter=maxIter)
-		else
-			expl <- recall$expl
+		expl <- recall$expl
 	}
 	
-	noAttr <- ncol(expl$expl)
-	attrNames <- colnames(expl$expl)
 	
 	# model explanation plot
 	if (visLevel %in% c("both","model")) {
+		
+		noAttr <- length(explainInfo$avNames)
+		attrNames <- names(explainInfo$avNames)
+		
 		if (is.null(displayAttributes)) {
 			displayAttributes <- attrNames
 			matched <- 1:length(attrNames)
@@ -422,6 +414,7 @@ explainVis<-function(model, trainData, testData,
 			if (any(is.na(matched)))
 				stop("Invalid attribute name(s) in parameter displayAttributes: ", paste(displayAttributes[ is.na(matched) ], collapse=", "))
 		} 
+		
 		preparePlot(fileName=paste(dirName,"/", fileName,"_model.", fileType, sep=""))
 		modelAVexplain(titles[1], titles[2], displayAttributes, explainInfo$avNames[matched],  
 				explAvg$attrPosAvg[matched], explAvg$attrNegAvg[matched], 
@@ -433,14 +426,44 @@ explainVis<-function(model, trainData, testData,
 	
 	# instance explanation plot
 	if (visLevel %in% c("both","instance")) {
+		
+		testDataDisc <- applyDiscretization(testData, explainInfo$discretization)
+		
+		if (method=="EXPLAIN") {
+			if (is.null(recall))
+				expl <- explain(model, testData, explainInfo=explainInfo, naMode=naMode, explainType=explainType, classValue=classValue, nLaplace=nLaplace)
+			else 
+				expl <- recall$expl
+		}
+		else if (method=="IME") {
+			if (is.null(recall))
+				expl <- ime(model, testData, classValue=classValue, imeInfo=explainInfo, pError=pError, err=err, batchSize=batchSize, maxIter=maxIter)
+			else
+				expl <- recall$expl
+		}
+		
+		noAttr <- ncol(expl$expl)
+		attrNames <- colnames(expl$expl)
+		
+		if (is.null(displayAttributes)) {
+			displayAttributes <- attrNames
+			matched <- 1:length(attrNames)
+		}
+		else { # check if provided names are correct
+			matched <- match(displayAttributes, attrNames)
+			if (any(is.na(matched)))
+				stop("Invalid attribute name(s) in parameter displayAttributes: ", paste(displayAttributes[ is.na(matched) ], collapse=", "))
+		} 
+		
+		testDataDiscExpl <- testDataDisc[,attrNames]
 		preparePlot(fileName=paste(dirName,"/", fileName,"_inst.", fileType, sep=""))
 		avPosAvg <- avNegAvg <- expl$expl
 		for (a in 1:noAttr) {
-			avPosAvg[,a] <- explAvg$"avPosAvg"[[a]][as.integer(testDataDisc[,a])]  
-			avNegAvg[,a] <- explAvg$"avNegAvg"[[a]][as.integer(testDataDisc[,a])] 
+			avPosAvg[,a] <- explAvg$"avPosAvg"[[a]][as.integer(testDataDiscExpl[[a]])]  
+			avNegAvg[,a] <- explAvg$"avNegAvg"[[a]][as.integer(testDataDiscExpl[[a]])] 
 		}
 		if (className %in% names(testData))
-			trueClass <- format(testData[,className], digits=noDecimalsInValueName)
+			trueClass <- format(testData[[className]], digits=noDecimalsInValueName)
 		else
 			trueClass<-vector(mode="character",length=noInst)
 		
@@ -450,14 +473,14 @@ explainVis<-function(model, trainData, testData,
 			# Predicted value/probability of the response: %P 
 			# True value/class of the response: %T
 			
-		    ititle <- titles[c(3,4)]
-		    ititle <- gsub("%I", row.names(testData)[i], ititle, fixed=TRUE)
+			ititle <- titles[c(3,4)]
+			ititle <- gsub("%I", row.names(testData)[i], ititle, fixed=TRUE)
 			ititle <- gsub("%P", format(expl$"pCXA"[i], digits=noDecimalsInValueName), ititle, fixed=TRUE)
 			ititle <- gsub("%T", trueClass[i], ititle, fixed=TRUE)
 			
-			explainVisPN(ititle[1], ititle[2], attrNames, 
-					as.character(format(testData[i,],digits=noDecimalsInValueName)), 
-					expl$"expl"[i,], avPosAvg[i,], avNegAvg[i,], 
+			explainVisPN(ititle[1], ititle[2], displayAttributes, 
+					as.character(format(testData[i,matched],digits=noDecimalsInValueName)), 
+					expl$"expl"[i,matched], avPosAvg[i,matched], avNegAvg[i,matched], 
 					threshold=displayThreshold, colors=colors, normalizeTo=normalizeTo)
 		}
 		if (fileType != "")
@@ -493,17 +516,18 @@ modelAVexplain<-function(titleName, subtitleName, attrNames, attrValues,
 	yLabel <- c()
 	usedValues <- list()
 	
+	# average explanations can be NA 
 	#normalization of explanations
 	if (normalizeTo > 0) {
 		if (modelVisCompact){ # normalize to parameter normalizeTo times the sum of absolute values of attribute-s contributions 
-			absSum <- sum(abs(attrExplainPos), abs(attrExplainNeg))
+			absSum <- sum(abs(attrExplainPos), abs(attrExplainNeg), na.rm = TRUE)
 			attrExplainPos <- attrExplainPos / absSum * normalizeTo
 			attrExplainNeg <- attrExplainNeg / absSum * normalizeTo
 		}
 		else { # normalize to parameter normalizeTo times the sum of absolute values of attribute values' contributions 
 			absSum <- 0
 			for(iA in 1:noAttr) 
-				absSum <- sum(absSum, abs(avExplainPos[[iA]]), abs(avExplainNeg[[iA]]))
+				absSum <- sum(absSum, abs(avExplainPos[[iA]]), abs(avExplainNeg[[iA]]), na.rm=TRUE)
 			attrExplainPos <- attrExplainPos / absSum * normalizeTo
 			attrExplainNeg <- attrExplainNeg / absSum * normalizeTo
 			for(iA in 1:noAttr) {
@@ -512,8 +536,9 @@ modelAVexplain<-function(titleName, subtitleName, attrNames, attrValues,
 			}
 		}		
 	}
+	
 	# getting limits and labels
-	xLim <- max(abs(attrExplainPos), abs(attrExplainNeg))
+	xLim <- max(abs(attrExplainPos), abs(attrExplainNeg), na.rm = TRUE)
 	if (modelVisCompact){
 		yLabel <- attrNames	
 	}
@@ -533,7 +558,7 @@ modelAVexplain<-function(titleName, subtitleName, attrNames, attrValues,
 	headerSpace <- 0.5
 	if (allValues <=5)
 		headerSpace <- 1
-	par(xpd=NA,mgp=c(2,1,0),mar=c(5,7,4,2))
+	par(xpd=NA,mgp=c(2,1,0),mar=c(5,8,4,2))
 	plot(x, y, type = "l", xlim = c(-xLim, xLim), ylim = c(1, allValues+headerSpace), xlab = "",
 			ylab = "", axes = F)
 	atLabel <- atLabelComp(xLim)
@@ -542,7 +567,7 @@ modelAVexplain<-function(titleName, subtitleName, attrNames, attrValues,
 	las = 1 ## horizontal
 	cex.axis <- 1
 	if (maxChars > 15) {
-		cex.axis <- 0.9    
+		cex.axis <- 0.75    
 		if (maxChars > 20)
 			cex.axis <- 0.6    
 	}		
@@ -571,7 +596,7 @@ modelAVexplain<-function(titleName, subtitleName, attrNames, attrValues,
 		rect(xDown, y, xUp, y+0.80*boxHeight, col=colAttrNeg)
 		y=y+1
 		if (!modelVisCompact){
-			for (v in 1:length(attrValues[[iA]])) {
+			for (v in seq(1, length.out=length(attrValues[[iA]]))) {
 				if (usedValues[[iA]][v]){
 					xDown <- 0
 					xUp <- avExplainPos[[iA]][[v]]
@@ -603,18 +628,22 @@ explainVisPN<-function(titleName, subtitleName, attrNames, attrValues, expl,
 		colAVpos <- colors[5]
 		colAVneg <- colors[6]
 	}
-		
+	
 	noAttr = length(attrNames)
 	absSum <- sum(abs(expl))
 	if (is.null(avgAVexplainPos))
 		avgAVexplainPos <- rep(0, length(expl))
 	if (is.null(avgAVexplainNeg))
 		avgAVexplainNeg <- rep(0, length(expl))
+	if (any(is.na(avgAVexplainPos)))
+		avgAVexplainPos[which(is.na(avgAVexplainPos))] <- 0
+	if (any(is.na(avgAVexplainNeg)))
+		avgAVexplainNeg[which(is.na(avgAVexplainNeg))] <- 0
 	# normalization of values
 	if (normalizeTo > 0 && absSum > 0){
-			expl <-  expl / absSum * normalizeTo
-			avgAVexplainPos <-  avgAVexplainPos / absSum * normalizeTo	
-			avgAVexplainNeg <-  avgAVexplainNeg / absSum * normalizeTo
+		expl <-  expl / absSum * normalizeTo
+		avgAVexplainPos <-  avgAVexplainPos / absSum * normalizeTo	
+		avgAVexplainNeg <-  avgAVexplainNeg / absSum * normalizeTo
 	}
 	usedAttr <- which(abs(expl[]) >= threshold)
 	noUsed <- length(usedAttr)
@@ -646,17 +675,17 @@ explainVisPN<-function(titleName, subtitleName, attrNames, attrValues, expl,
 				# usedAttrValues[[iA]][[v]] <- gsub("_","\n",usedAttrValues[[iA]][[v]],fixed=TRUE) ;   
 			}		
 		}  
-
+		
 		boxHeight = 1.0
 		chExp = 1.0  ## char expansion for boxes
 		xLim <- max(abs(expl),abs(avgAVexplainPos),abs(avgAVexplainNeg))
 		x <- c(0, 0)
 		y <- c(1, noUsed)
-		par(xpd=NA,mgp=c(3,0.7,0),mar=c(5.5,7,5,7))
+		par(xpd=NA,mgp=c(3,0.7,0),mar=c(5.5,8,5,7))
 		plot(x, y, type = "l", xlim = c(-xLim, xLim), ylim = c(1.0, noUsed+0.5), xlab = "", ylab="", axes = F)
 		text(xLim*1.09,(noUsed+0.4), labels=c("attribute value"), adj = c(0, 0))
 		text(-xLim*1.09,(noUsed+0.4), labels=c("attribute"), adj = c(1, 0))
-			
+		
 		atLabel <- atLabelComp(xLim)
 		axis(1, at=atLabel,labels=atLabel)
 		## left y axis, attribute names
@@ -665,7 +694,7 @@ explainVisPN<-function(titleName, subtitleName, attrNames, attrValues, expl,
 		cex.axisA = 1
 		maxCharsA = max(nchar(anam))
 		if (maxCharsA > 15) {
-			cex.axisA = 0.9    
+			cex.axisA = 0.75    
 			if (maxCharsA > 20)
 				cex.axisA = 0.6    
 		}	
@@ -673,8 +702,8 @@ explainVisPN<-function(titleName, subtitleName, attrNames, attrValues, expl,
 		
 		lasV = 1 ## horizontal
 		cex.axisV = 1
-		if (maxCharsV > 25) {
-			cex.axisV = 0.9    
+		if (maxCharsV > 15) {
+			cex.axisV = 0.75    
 			if (maxCharsV > 20)
 				cex.axisV = 0.6    
 		}		

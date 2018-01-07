@@ -1,6 +1,7 @@
+ExplainPrediction-1.3.0, 2017-12-27: robustness improvement preventing crash when some attributes have all values missing
 ExplainPrediction-1.2.3, 2017-11-22: removed assign to global environment to remove a stupid CRAN note
 ExplainPrediction-1.2.2, 2017-11-22: submit to CRAN modification
-ExplainPrediction-1.2.1, 2017-10-31: small fixes to visualization 
+ExplainPrediction-1.2.1, 2017-10-31: small fixes of visualization 
 ExplainPrediction-1.2.0, 2017-09-06: titles and subtitles in graphs are template based, color used is parametrized 
 ExplainPrediction-1.1.9, 2017-05-10: fixed bug in explainVis, test data dolumns were not reordered according to formula 
 ExplainPrediction-1.1.8, 2017-04-03: update for changed exports in packages CORElearn and semiArtificial 

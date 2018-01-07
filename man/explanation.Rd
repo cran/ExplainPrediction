@@ -97,7 +97,7 @@ explainVis(model, trainData, testData,
                   for each attribute independently.}
 	 \item{noAvgBins}{For IME method the number of discretization bins used to present model level explanations
 	  and average explanations.}
-    \item{displayAttributes}{ The vector of attribute names which are visualized in model level visualization.
+    \item{displayAttributes}{ The vector of attribute names which are visualized, subject to \code{displayThreshold}) and value \code{modelVisCompact}.
     The default value \code{displayThreshold=NULL} displays all attributes and their values.}
     \item{modelVisCompact}{ The logical value controlling if attribute values are displayed
      in model level visualization. The default value \code{modelVisCompact=FALSE} displays all values of
